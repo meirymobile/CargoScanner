@@ -4,15 +4,43 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <title>סורק שטרי מטען</title>
+    <title>סורק לוגיסטי מתקדם</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         body { font-family: -apple-system, sans-serif; text-align: center; background: #f2f2f7; padding: 20px; margin: 0; }
-        #reader { width: 100%; max-width: 500px; margin: 20px auto; border-radius: 12px; overflow: hidden; background: #000; box-shadow: 0 8px 20px rgba(0,0,0,0.2); }
+        
+        /* מסגרת המצלמה עם מעבר צבע חלק */
+        #reader { 
+            width: 100%; 
+            max-width: 500px; 
+            margin: 20px auto; 
+            border-radius: 20px; 
+            overflow: hidden; 
+            background: #000; 
+            box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+            border: 5px solid transparent;
+            transition: border-color 0.3s ease;
+        }
+
+        /* מחלקה שתופעל בזיהוי מוצלח */
+        .scan-success-flash {
+            border-color: #34c759 !important;
+        }
+
         .info-panel { background: white; padding: 20px; border-radius: 15px; max-width: 500px; margin: auto; }
-        #scanned-text { display: block; margin: 15px 0; font-family: monospace; font-size: 1.4em; color: #007aff; background: #f0f0f5; padding: 10px; border-radius: 8px; word-break: break-all; }
+        #scanned-text { 
+            display: block; 
+            margin: 15px 0; 
+            font-family: monospace; 
+            font-size: 1.4em; 
+            color: #007aff; 
+            background: #f0f0f5; 
+            padding: 10px; 
+            border-radius: 8px; 
+            word-break: break-all;
+            min-height: 1.5em;
+        }
         .btn { background: #007aff; color: white; border: none; padding: 16px; border-radius: 12px; font-size: 18px; width: 100%; font-weight: bold; cursor: pointer; }
-        #status { margin-bottom: 10px; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -21,20 +49,57 @@
     <div id="reader"></div>
     
     <div class="info-panel">
-        <div id="status">מחפש ברקוד...</div>
+        <div id="status">סרוק שטר מטען</div>
         <span id="scanned-text">---</span>
-        <button id="copy-btn" class="btn" onclick="copyText()">העתק מספר שטר מטען</button>
+        <button id="copy-btn" class="btn" onclick="copyText()">העתק לזיכרון</button>
     </div>
 
     <script>
         const statusElem = document.getElementById('status');
         const textElem = document.getElementById('scanned-text');
+        const readerElem = document.getElementById('reader');
+
+        // פונקציה ליצירת צליל צפצוף (Beep) ללא קובץ חיצוני
+        function playBeep() {
+            const context = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = context.createOscillator();
+            const gainNode = context.createGain();
+
+            oscillator.type = "sine";
+            oscillator.frequency.setValueAtTime(880, context.currentTime); // תדר הצליל
+            oscillator.connect(gainNode);
+            gainNode.connect(context.destination);
+
+            gainNode.gain.setValueAtTime(0, context.currentTime);
+            gainNode.gain.linearRampToValueAtTime(0.5, context.currentTime + 0.01);
+            gainNode.gain.linearRampToValueAtTime(0, context.currentTime + 0.2);
+
+            oscillator.start();
+            oscillator.stop(context.currentTime + 0.2);
+        }
 
         function onScanSuccess(decodedText) {
+            // הגנה מפני סריקה כפולה של אותו קוד בשנייה אחת
+            if (textElem.innerText === decodedText) return;
+
             textElem.innerText = decodedText;
-            statusElem.innerText = "נמצא שטר מטען! ✅";
-            statusElem.style.color = "#34c759";
-            navigator.vibrate(100); // רטט קצר להצלחה
+            
+            // 1. חיווי ויזואלי - מסגרת ירוקה
+            readerElem.classList.add('scan-success-flash');
+            setTimeout(() => readerElem.classList.remove('scan-success-flash'), 1000);
+
+            // 2. רטט (עובד בעיקר באנדרואיד ובחלק מהדפדפנים באייפון)
+            if (navigator.vibrate) {
+                navigator.vibrate(150);
+            }
+
+            // 3. צליל צפצוף
+            try {
+                playBeep();
+            } catch (e) {
+                console.log("Audio play failed", e);
+            }
+
             copyText(decodedText);
         }
 
@@ -42,19 +107,20 @@
             const t = text || textElem.innerText;
             if (t === "---") return;
             navigator.clipboard.writeText(t).then(() => {
-                document.getElementById('copy-btn').innerText = "הועתק לזיכרון! 📋";
-                setTimeout(() => { document.getElementById('copy-btn').innerText = "העתק מספר שטר מטען"; }, 2000);
+                const btn = document.getElementById('copy-btn');
+                btn.innerText = "הועתק בהצלחה! ✅";
+                btn.style.background = "#34c759";
+                setTimeout(() => {
+                    btn.innerText = "העתק לזיכרון";
+                    btn.style.background = "#007aff";
+                }, 2000);
             });
         }
 
         const html5QrCode = new Html5Qrcode("reader");
-        
         const config = { 
             fps: 25, 
-            // תיבה גדולה וצרה שמתאימה למבנה של שטר מטען
             qrbox: { width: 320, height: 120 }, 
-            aspectRatio: 1.0,
-            // הגדרות רזולוציה גבוהה במיוחד
             videoConstraints: {
                 facingMode: "environment",
                 width: { ideal: 1920 },
@@ -62,15 +128,8 @@
             }
         };
 
-        // הפעלה עם תמיכה בכל הפורמטים הלוגיסטיים
-        html5QrCode.start(
-            { facingMode: "environment" }, 
-            config, 
-            onScanSuccess
-        ).catch(err => {
-            statusElem.innerText = "שגיאה: וודא HTTPS ואישור מצלמה";
-            console.error(err);
-        });
+        html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
+            .catch(err => console.error(err));
     </script>
 </body>
 </html>
