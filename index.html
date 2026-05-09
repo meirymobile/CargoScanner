@@ -4,68 +4,71 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <title>סורק ברקוד</title>
+    <title>סורק שטרי מטען</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
-        body { font-family: sans-serif; text-align: center; background: #f2f2f7; padding: 20px; }
-        #reader { width: 100%; max-width: 400px; margin: auto; border-radius: 15px; overflow: hidden; background: #000; }
-        .controls { margin-top: 20px; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        #scanned-text { display: block; margin: 10px 0; font-size: 1.2em; font-weight: bold; min-height: 1.5em; color: #007aff; }
-        .btn { background: #007aff; color: white; border: none; padding: 15px 30px; border-radius: 10px; font-size: 16px; width: 100%; cursor: pointer; }
-        #status { font-size: 0.9em; color: #666; margin-bottom: 10px; }
+        body { font-family: -apple-system, sans-serif; text-align: center; background: #f2f2f7; padding: 20px; margin: 0; }
+        #reader { width: 100%; max-width: 500px; margin: 20px auto; border-radius: 12px; overflow: hidden; background: #000; box-shadow: 0 8px 20px rgba(0,0,0,0.2); }
+        .info-panel { background: white; padding: 20px; border-radius: 15px; max-width: 500px; margin: auto; }
+        #scanned-text { display: block; margin: 15px 0; font-family: monospace; font-size: 1.4em; color: #007aff; background: #f0f0f5; padding: 10px; border-radius: 8px; word-break: break-all; }
+        .btn { background: #007aff; color: white; border: none; padding: 16px; border-radius: 12px; font-size: 18px; width: 100%; font-weight: bold; cursor: pointer; }
+        #status { margin-bottom: 10px; font-weight: bold; }
     </style>
 </head>
 <body>
 
-    <h2>סורק ברקוד</h2>
+    <h2 style="margin-top:40px;">סורק לוגיסטי</h2>
     <div id="reader"></div>
     
-    <div class="controls">
-        <div id="status">ממתין לסריקה...</div>
+    <div class="info-panel">
+        <div id="status">מחפש ברקוד...</div>
         <span id="scanned-text">---</span>
-        <button id="copy-btn" class="btn" onclick="copyText()">העתק לזיכרון</button>
+        <button id="copy-btn" class="btn" onclick="copyText()">העתק מספר שטר מטען</button>
     </div>
 
     <script>
-        const scannedTextElement = document.getElementById('scanned-text');
-        const statusElement = document.getElementById('status');
+        const statusElem = document.getElementById('status');
+        const textElem = document.getElementById('scanned-text');
 
         function onScanSuccess(decodedText) {
-            scannedTextElement.innerText = decodedText;
-            statusElement.innerText = "הסריקה הצליחה!";
-            statusElement.style.color = "green";
-            
-            // העתקה אוטומטית ברגע הזיהוי
+            textElem.innerText = decodedText;
+            statusElem.innerText = "נמצא שטר מטען! ✅";
+            statusElem.style.color = "#34c759";
+            navigator.vibrate(100); // רטט קצר להצלחה
             copyText(decodedText);
         }
 
         function copyText(text = null) {
-            const t = text || scannedTextElement.innerText;
+            const t = text || textElem.innerText;
             if (t === "---") return;
-            
             navigator.clipboard.writeText(t).then(() => {
-                const btn = document.getElementById('copy-btn');
-                btn.innerText = "הועתק! ✅";
-                btn.style.background = "#34c759";
-                setTimeout(() => {
-                    btn.innerText = "העתק לזיכרון";
-                    btn.style.background = "#007aff";
-                }, 2000);
+                document.getElementById('copy-btn').innerText = "הועתק לזיכרון! 📋";
+                setTimeout(() => { document.getElementById('copy-btn').innerText = "העתק מספר שטר מטען"; }, 2000);
             });
         }
 
-        const html5QrcodeScanner = new Html5Qrcode("reader");
-        // שימוש בהגדרות אופטימליות לברקודים של מוצרים (פסים)
-        html5QrcodeScanner.start(
+        const html5QrCode = new Html5Qrcode("reader");
+        
+        const config = { 
+            fps: 25, 
+            // תיבה גדולה וצרה שמתאימה למבנה של שטר מטען
+            qrbox: { width: 320, height: 120 }, 
+            aspectRatio: 1.0,
+            // הגדרות רזולוציה גבוהה במיוחד
+            videoConstraints: {
+                facingMode: "environment",
+                width: { ideal: 1920 },
+                height: { ideal: 1080 }
+            }
+        };
+
+        // הפעלה עם תמיכה בכל הפורמטים הלוגיסטיים
+        html5QrCode.start(
             { facingMode: "environment" }, 
-            { 
-                fps: 15, 
-                qrbox: { width: 300, height: 150 }, // תיבה מלבנית מתאימה לברקוד
-                aspectRatio: 1.0 
-            },
+            config, 
             onScanSuccess
         ).catch(err => {
-            statusElement.innerText = "שגיאה בגישה למצלמה";
+            statusElem.innerText = "שגיאה: וודא HTTPS ואישור מצלמה";
             console.error(err);
         });
     </script>
