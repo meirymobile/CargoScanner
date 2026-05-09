@@ -3,185 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    
-    <!-- הגדרות לאייפון כדי שזה ייראה כאפליקציה (PWA) -->
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="סורק מהיר">
-    
-    <title>סורק ברקוד אישי</title>
-    
-    <!-- ספריית הסריקה - Html5-QRCode -->
+    <title>סורק ברקוד</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
-    
     <style>
-        :root {
-            --primary-color: #007aff;
-            --success-color: #34c759;
-            --bg-color: #f2f2f7;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg-color);
-            margin: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 20px;
-            color: #1c1c1e;
-        }
-
-        h2 { margin-top: 40px; margin-bottom: 20px; font-weight: 600; }
-
-        /* אזור המצלמה */
-        #reader {
-            width: 100%;
-            max-width: 400px;
-            border-radius: 20px;
-            overflow: hidden;
-            background: #000;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
-        }
-
-        /* עיצוב כפתור בחירת מצלמה (אם הספרייה מציגה אותו) */
-        button {
-            -webkit-appearance: none;
-            cursor: pointer;
-        }
-
-        /* אזור התוצאה */
-        #result-container {
-            margin-top: 25px;
-            width: 90%;
-            max-width: 400px;
-            background: white;
-            padding: 20px;
-            border-radius: 15px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-            display: none; /* יופיע רק לאחר סריקה */
-            text-align: center;
-        }
-
-        .result-label { font-size: 14px; color: #8e8e93; margin-bottom: 8px; }
-        #scanned-text { 
-            font-size: 18px; 
-            word-break: break-all; 
-            display: block; 
-            margin-bottom: 15px; 
-            font-weight: 500;
-        }
-
-        .btn-copy {
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            padding: 12px 25px;
-            border-radius: 10px;
-            font-size: 16px;
-            font-weight: 600;
-            transition: transform 0.1s;
-        }
-
-        .btn-copy:active { transform: scale(0.95); }
-
-        #copy-toast {
-            position: fixed;
-            bottom: 50px;
-            background: rgba(0,0,0,0.7);
-            color: white;
-            padding: 10px 20px;
-            border-radius: 20px;
-            display: none;
-            animation: fadeInOut 2s ease;
-        }
-
-        @keyframes fadeInOut {
-            0% { opacity: 0; }
-            20% { opacity: 1; }
-            80% { opacity: 1; }
-            100% { opacity: 0; }
-        }
+        body { font-family: sans-serif; text-align: center; background: #f2f2f7; padding: 20px; }
+        #reader { width: 100%; max-width: 400px; margin: auto; border-radius: 15px; overflow: hidden; background: #000; }
+        .controls { margin-top: 20px; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        #scanned-text { display: block; margin: 10px 0; font-size: 1.2em; font-weight: bold; min-height: 1.5em; color: #007aff; }
+        .btn { background: #007aff; color: white; border: none; padding: 15px 30px; border-radius: 10px; font-size: 16px; width: 100%; cursor: pointer; }
+        #status { font-size: 0.9em; color: #666; margin-bottom: 10px; }
     </style>
 </head>
 <body>
 
     <h2>סורק ברקוד</h2>
-    
     <div id="reader"></div>
     
-    <div id="result-container">
-        <div class="result-label">הטקסט שנסרק:</div>
-        <strong id="scanned-text"></strong>
-        <button class="btn-copy" onclick="copyToClipboard()">העתק ידנית</button>
+    <div class="controls">
+        <div id="status">ממתין לסריקה...</div>
+        <span id="scanned-text">---</span>
+        <button id="copy-btn" class="btn" onclick="copyText()">העתק לזיכרון</button>
     </div>
 
-    <div id="copy-toast">הועתק לזיכרון! ✅</div>
-
     <script>
-        const html5QrCode = new Html5Qrcode("reader");
         const scannedTextElement = document.getElementById('scanned-text');
-        const resultContainer = document.getElementById('result-container');
-        const toast = document.getElementById('copy-toast');
+        const statusElement = document.getElementById('status');
 
-        // הגדרות לסורק
-        const config = { 
-            fps: 15, 
-            qrbox: { width: 250, height: 150 },
-            aspectRatio: 1.0
-        };
+        function onScanSuccess(decodedText) {
+            scannedTextElement.innerText = decodedText;
+            statusElement.innerText = "הסריקה הצליחה!";
+            statusElement.style.color = "green";
+            
+            // העתקה אוטומטית ברגע הזיהוי
+            copyText(decodedText);
+        }
 
-        // הפעלת המצלמה
-        html5QrCode.start(
-            { facingMode: "environment" }, // מצלמה אחורית
-            config,
-            (decodedText) => {
-                // מה קורה כשנסרק קוד בהצלחה:
-                processResult(decodedText);
+        function copyText(text = null) {
+            const t = text || scannedTextElement.innerText;
+            if (t === "---") return;
+            
+            navigator.clipboard.writeText(t).then(() => {
+                const btn = document.getElementById('copy-btn');
+                btn.innerText = "הועתק! ✅";
+                btn.style.background = "#34c759";
+                setTimeout(() => {
+                    btn.innerText = "העתק לזיכרון";
+                    btn.style.background = "#007aff";
+                }, 2000);
+            });
+        }
+
+        const html5QrcodeScanner = new Html5Qrcode("reader");
+        // שימוש בהגדרות אופטימליות לברקודים של מוצרים (פסים)
+        html5QrcodeScanner.start(
+            { facingMode: "environment" }, 
+            { 
+                fps: 15, 
+                qrbox: { width: 300, height: 150 }, // תיבה מלבנית מתאימה לברקוד
+                aspectRatio: 1.0 
             },
-            (errorMessage) => {
-                // שגיאות סריקה רגילות (אפשר להתעלם)
-            }
-        ).catch((err) => {
-            console.error("לא ניתן להפעיל מצלמה:", err);
-            alert("יש לאשר גישה למצלמה ולהשתמש בכתובת HTTPS");
+            onScanSuccess
+        ).catch(err => {
+            statusElement.innerText = "שגיאה בגישה למצלמה";
+            console.error(err);
         });
-
-        function processResult(text) {
-            // הצגת התוצאה במסך
-            scannedTextElement.innerText = text;
-            resultContainer.style.display = 'block';
-
-            // העתקה אוטומטית לזיכרון
-            copyToClipboard(text);
-        }
-
-        function copyToClipboard(specificText = null) {
-            const textToCopy = specificText || scannedTextElement.innerText;
-            
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(textToCopy).then(() => {
-                    showToast();
-                });
-            } else {
-                // פתרון גיבוי למכשירים ישנים
-                const textArea = document.createElement("textarea");
-                textArea.value = textToCopy;
-                document.body.appendChild(textArea);
-                textArea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textArea);
-                showToast();
-            }
-        }
-
-        function showToast() {
-            toast.style.display = 'block';
-            setTimeout(() => { toast.style.display = 'none'; }, 2000);
-            
-            // משוב רטט קטן (אם המכשיר תומך)
-            if (navigator.vibrate) navigator.vibrate(50);
-        }
     </script>
 </body>
 </html>
