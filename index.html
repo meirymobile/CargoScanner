@@ -1,24 +1,184 @@
-const html5QrCode = new Html5Qrcode("reader");
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>סורק שטרי מטען מקצועי</title>
+    
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    
+    <style>
+        :root {
+            --ios-blue: #007aff;
+            --ios-green: #34c759;
+            --ios-bg: #f2f2f7;
+        }
 
-const config = { 
-    fps: 30, // מקסימום מהירות
-    // הגדלת התיבה כדי שתכיל את כל הברקוד הארוך
-    qrbox: { width: 350, height: 120 }, 
-    aspectRatio: 1.0,
-    // הגדרה קריטית לברקודים צפופים:
-    videoConstraints: {
-        facingMode: "environment",
-        width: { ideal: 1920 },
-        height: { ideal: 1080 }
-    }
-};
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--ios-bg);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
 
-// הוספת הגדרה ספציפית ל-Code 128
-html5QrCode.start(
-    { facingMode: "environment" }, 
-    config,
-    onScanSuccess,
-    undefined,
-    // אילוץ הסורק להתמקד בברקודים קוויים
-    { formatsToSupport: [ Html5QrcodeSupportedFormats.CODE_128 ] }
-).catch(err => console.error(err));
+        h2 { margin-top: 40px; color: #1c1c1e; }
+
+        /* אזור המצלמה */
+        #reader {
+            width: 100%;
+            max-width: 500px;
+            border-radius: 20px;
+            overflow: hidden;
+            background: #000;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            border: 4px solid transparent;
+            transition: border-color 0.3s ease;
+        }
+
+        /* חיווי ויזואלי להצלחה */
+        .scan-success {
+            border-color: var(--ios-green) !important;
+        }
+
+        /* פאנל תוצאות */
+        .info-panel {
+            margin-top: 20px;
+            width: 100%;
+            max-width: 500px;
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            box-sizing: border-box;
+        }
+
+        #scanned-text {
+            display: block;
+            background: #f0f0f5;
+            padding: 15px;
+            border-radius: 10px;
+            font-family: monospace;
+            font-size: 1.2rem;
+            word-break: break-all;
+            margin: 15px 0;
+            color: var(--ios-blue);
+            min-height: 1.5em;
+        }
+
+        .btn-copy {
+            background-color: var(--ios-blue);
+            color: white;
+            border: none;
+            padding: 16px;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 600;
+            width: 100%;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-copy:active { background-color: #0051a8; }
+
+        #status { font-size: 14px; color: #8e8e93; }
+    </style>
+</head>
+<body>
+
+    <h2>סורק שטרי מטען</h2>
+    
+    <div id="reader"></div>
+    
+    <div class="info-panel">
+        <div id="status">ממתין לסריקת ברקוד...</div>
+        <div id="scanned-text">---</div>
+        <button class="btn-copy" id="copy-btn" onclick="manualCopy()">העתק מספר שטר מטען</button>
+    </div>
+
+    <script>
+        const textDisplay = document.getElementById('scanned-text');
+        const statusDisplay = document.getElementById('status');
+        const readerElement = document.getElementById('reader');
+        const copyBtn = document.getElementById('copy-btn');
+
+        // פונקציה לצפצוף אלקטרוני
+        function beep() {
+            const context = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = context.createOscillator();
+            const gain = context.createGain();
+            osc.connect(gain);
+            gain.connect(context.destination);
+            osc.frequency.value = 880;
+            gain.gain.setValueAtTime(0, context.currentTime);
+            gain.gain.linearRampToValueAtTime(0.3, context.currentTime + 0.01);
+            gain.gain.linearRampToValueAtTime(0, context.currentTime + 0.2);
+            osc.start();
+            osc.stop(context.currentTime + 0.2);
+        }
+
+        function onScanSuccess(decodedText) {
+            // מניעת כפילויות רגעיות
+            if (textDisplay.innerText === decodedText) return;
+
+            textDisplay.innerText = decodedText;
+            statusDisplay.innerText = "זוהה בהצלחה! ✅";
+            statusDisplay.style.color = "#34c759";
+
+            // חיווי ויזואלי: מסגרת ירוקה
+            readerElement.classList.add('scan-success');
+            setTimeout(() => readerElement.classList.remove('scan-success'), 600);
+
+            // צליל ורטט
+            try { beep(); } catch(e) {}
+            if (navigator.vibrate) navigator.vibrate(100);
+
+            // העתקה אוטומטית
+            copyToClipboard(decodedText);
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                copyBtn.innerText = "הועתק לזיכרון! 📋";
+                copyBtn.style.background = "#34c759";
+                setTimeout(() => {
+                    copyBtn.innerText = "העתק מספר שטר מטען";
+                    copyBtn.style.background = "#007aff";
+                }, 2000);
+            });
+        }
+
+        function manualCopy() {
+            const val = textDisplay.innerText;
+            if (val !== "---") copyToClipboard(val);
+        }
+
+        // הגדרות סורק מותאמות לשטרי מטען (Code 128 צפוף)
+        const html5QrCode = new Html5Qrcode("reader");
+        const config = { 
+            fps: 30, 
+            qrbox: { width: 350, height: 150 }, // תיבה רחבה לברקודים ארוכים
+            aspectRatio: 1.0,
+            videoConstraints: {
+                facingMode: "environment",
+                width: { ideal: 1920 },
+                height: { ideal: 1080 }
+            }
+        };
+
+        // הפעלה עם דגש על ברקודים קוויים
+        html5QrCode.start(
+            { facingMode: "environment" }, 
+            config, 
+            onScanSuccess
+        ).catch(err => {
+            statusDisplay.innerText = "שגיאה: וודא שימוש ב-HTTPS ואישור מצלמה";
+            console.error(err);
+        });
+    </script>
+</body>
+</html>
